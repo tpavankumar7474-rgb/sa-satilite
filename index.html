@@ -7,13 +7,24 @@
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"
+  />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"
+  />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
   <style>
     html, body, #map {
       height: 100%;
       width: 100%;
       margin: 0;
       padding: 0;
+      background: #000;
     }
   </style>
 </head>
@@ -21,42 +32,61 @@
   <div id="map"></div>
 
   <script>
-    // Initialize the map
+    // --- Initialize Map ---
     const map = L.map("map", {
-      center: [23.8859, 45.0792],
+      center: [23.8859, 45.0792], // Saudi Arabia center
       zoom: 5,
       zoomControl: false,
       attributionControl: false,
     });
 
-    // Background
+    // --- Base Map Layer ---
     L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
       maxZoom: 12,
       minZoom: 4,
     }).addTo(map);
 
-    // Parse parameters from Grafana iframe URL
+    // --- Parse URL Parameters (from Grafana iframe) ---
     const params = new URLSearchParams(window.location.search);
-
     const lats = params.get("lat")?.split(",").map(Number) || [];
     const lons = params.get("lon")?.split(",").map(Number) || [];
     const counts = params.get("count")?.split(",").map(Number) || [];
+    const states = params.get("state")?.split(",") || [];
 
-    // Plot data points
+    // --- Create Cluster Group ---
+    const markers = L.markerClusterGroup({
+      showCoverageOnHover: false,
+      maxClusterRadius: 40,
+      spiderfyOnMaxZoom: true,
+    });
+
+    // --- Add Circle Markers ---
     for (let i = 0; i < lats.length; i++) {
       const lat = lats[i];
       const lon = lons[i];
       const val = counts[i] || 0;
+      const state = decodeURIComponent(states[i] || "Unknown");
 
       if (!isNaN(lat) && !isNaN(lon)) {
-        L.circleMarker([lat, lon], {
-          radius: 5 + val / 50, // marker size based on value
-          color: "#00ffff",
-          fillColor: "#00ffff",
-          fillOpacity: 0.5,
-          weight: 0.5,
-        }).addTo(map);
+        const marker = L.circleMarker([lat, lon], {
+          radius: 6 + val / 40, // marker size adjusts by value
+          color: "#FF0000",     // red border
+          fillColor: "#FF0000", // red fill
+          fillOpacity: 0.7,
+          weight: 1.2,
+        });
+
+        marker.bindPopup(`<b>${state}</b><br>Count: ${val}`);
+        markers.addLayer(marker);
       }
+    }
+
+    // --- Add Clusters to Map ---
+    map.addLayer(markers);
+
+    // --- Auto Zoom to Fit Markers ---
+    if (markers.getLayers().length > 0) {
+      map.fitBounds(markers.getBounds(), { padding: [50, 50] });
     }
   </script>
 </body>
