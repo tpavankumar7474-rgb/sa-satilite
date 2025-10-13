@@ -14,12 +14,6 @@
       width: 100%;
       margin: 0;
       padding: 0;
-      background: #000;
-    }
-    /* Map styling */
-    .leaflet-container {
-      background: #000;
-      outline: none;
     }
   </style>
 </head>
@@ -27,63 +21,43 @@
   <div id="map"></div>
 
   <script>
-    // === Initialize Map ===
+    // Initialize the map
     const map = L.map("map", {
       center: [23.8859, 45.0792],
       zoom: 5,
       zoomControl: false,
-      attributionControl: false
+      attributionControl: false,
     });
 
-    // === Relief / Topographic Background ===
+    // Background
     L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
       maxZoom: 12,
       minZoom: 4,
     }).addTo(map);
 
-    // === Saudi Arabia GeoJSON Borders ===
-    fetch("saudi_regions.geojson")
-      .then(res => res.json())
-      .then(geojson => {
-        L.geoJSON(geojson, {
-          style: {
-            color: "#ff8800",
-            weight: 2,
-            fill: false
-          }
+    // Parse parameters from Grafana iframe URL
+    const params = new URLSearchParams(window.location.search);
+
+    const lats = params.get("lat")?.split(",").map(Number) || [];
+    const lons = params.get("lon")?.split(",").map(Number) || [];
+    const counts = params.get("count")?.split(",").map(Number) || [];
+
+    // Plot data points
+    for (let i = 0; i < lats.length; i++) {
+      const lat = lats[i];
+      const lon = lons[i];
+      const val = counts[i] || 0;
+
+      if (!isNaN(lat) && !isNaN(lon)) {
+        L.circleMarker([lat, lon], {
+          radius: 5 + val / 50, // marker size based on value
+          color: "#00ffff",
+          fillColor: "#00ffff",
+          fillOpacity: 0.5,
+          weight: 0.5,
         }).addTo(map);
-      })
-      .catch(err => console.error("GeoJSON load error:", err));
-
-    // === Load Dynamic Data Points ===
-    // You can call this API or dynamically inject data (e.g. from Grafana iframe)
-    // Example endpoint should return: [{lat:24.7, lon:46.6, value:100}, ...]
-
-    async function loadData() {
-      try {
-        const res = await fetch("points.json"); // or API endpoint
-        const points = await res.json();
-
-        // Handle very large datasets efficiently
-        const markers = L.layerGroup();
-        for (const p of points) {
-          if (p.lat && p.lon) {
-            L.circleMarker([p.lat, p.lon], {
-              radius: 4,
-              color: "#00ffff",
-              fillColor: "#00ffff",
-              fillOpacity: 0.5,
-              weight: 0.5
-            }).addTo(markers);
-          }
-        }
-        markers.addTo(map);
-      } catch (err) {
-        console.error("Data load error:", err);
       }
     }
-
-    loadData();
   </script>
 </body>
 </html>
