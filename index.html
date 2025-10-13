@@ -1,20 +1,25 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet-canvas-markers/dist/leaflet.canvas-markers.min.js"></script>
   <style>
     html, body, #map {
-      margin: 0;
       height: 100%;
       width: 100%;
+      margin: 0;
+      padding: 0;
       background: #000;
+    }
+    /* Map styling */
+    .leaflet-container {
+      background: #000;
+      outline: none;
     }
   </style>
 </head>
@@ -22,55 +27,63 @@
   <div id="map"></div>
 
   <script>
-    // Parse URL parameters
-    const params = new URLSearchParams(window.location.search);
-    const latList = (params.get("lat") || "").split(",").map(Number);
-    const lonList = (params.get("long") || "").split(",").map(Number);
-    const countList = (params.get("count") || "").split(",").map(Number);
-
-    // Initialize map
+    // === Initialize Map ===
     const map = L.map("map", {
+      center: [23.8859, 45.0792],
+      zoom: 5,
       zoomControl: false,
-      attributionControl: false,
-    }).setView([23.8859, 45.0792], 5);
-
-    // Add Saudi overlay map
-    const bounds = [[15, 34], [33, 56]];
-    L.imageOverlay("saudi_map.png", bounds).addTo(map);
-
-    // Add region outlines (optional)
-    fetch("saudi_regions.geojson")
-      .then((res) => res.json())
-      .then((data) => {
-        L.geoJSON(data, {
-          style: {
-            color: "#f9a825",
-            weight: 1.5,
-          },
-        }).addTo(map);
-      });
-
-    // Handle very large datasets efficiently using Canvas Layer
-    const canvasLayer = L.canvasLayer().delegate({
-      onDrawLayer: function (info) {
-        const ctx = info.canvas.getContext("2d");
-        const map = info.layer._map;
-
-        ctx.clearRect(0, 0, info.canvas.width, info.canvas.height);
-        ctx.fillStyle = "rgba(0,150,255,0.8)";
-
-        for (let i = 0; i < latList.length; i++) {
-          const lat = latList[i], lon = lonList[i];
-          if (isNaN(lat) || isNaN(lon)) continue;
-          const p = map.latLngToContainerPoint([lat, lon]);
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      },
+      attributionControl: false
     });
 
-    canvasLayer.addTo(map);
+    // === Relief / Topographic Background ===
+    L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
+      maxZoom: 12,
+      minZoom: 4,
+    }).addTo(map);
+
+    // === Saudi Arabia GeoJSON Borders ===
+    fetch("saudi_regions.geojson")
+      .then(res => res.json())
+      .then(geojson => {
+        L.geoJSON(geojson, {
+          style: {
+            color: "#ff8800",
+            weight: 2,
+            fill: false
+          }
+        }).addTo(map);
+      })
+      .catch(err => console.error("GeoJSON load error:", err));
+
+    // === Load Dynamic Data Points ===
+    // You can call this API or dynamically inject data (e.g. from Grafana iframe)
+    // Example endpoint should return: [{lat:24.7, lon:46.6, value:100}, ...]
+
+    async function loadData() {
+      try {
+        const res = await fetch("points.json"); // or API endpoint
+        const points = await res.json();
+
+        // Handle very large datasets efficiently
+        const markers = L.layerGroup();
+        for (const p of points) {
+          if (p.lat && p.lon) {
+            L.circleMarker([p.lat, p.lon], {
+              radius: 4,
+              color: "#00ffff",
+              fillColor: "#00ffff",
+              fillOpacity: 0.5,
+              weight: 0.5
+            }).addTo(markers);
+          }
+        }
+        markers.addTo(map);
+      } catch (err) {
+        console.error("Data load error:", err);
+      }
+    }
+
+    loadData();
   </script>
 </body>
 </html>
