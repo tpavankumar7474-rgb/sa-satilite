@@ -1,53 +1,76 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-    <!-- Optional: Boost performance for big datasets -->
-    <script src="https://unpkg.com/leaflet-ajax/dist/leaflet.ajax.min.js"></script>
-
-    <style>
-        html, body, #map {
-            height: 100%;
-            width: 100%;
-            margin: 0;
-            padding: 0;
-            background: #000;
-        }
-        .leaflet-container {
-            background: none !important;
-        }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-canvas-markers/dist/leaflet.canvas-markers.min.js"></script>
+  <style>
+    html, body, #map {
+      margin: 0;
+      height: 100%;
+      width: 100%;
+      background: #000;
+    }
+  </style>
 </head>
 <body>
-    <div id="map"></div>
-    <script>
-        // === Initialize Map (Saudi Arabia centered) ===
-        const map = L.map('map', {
-            zoomControl: false,
-            attributionControl: false
-        }).setView([23.8859, 45.0792], 5);
+  <div id="map"></div>
 
-        // === Add your static PNG relief map overlay ===
-        // Adjust these bounds to fit your exported PNG
-        const bounds = [[15, 34], [33, 56]];
-        L.imageOverlay('saudi_map.png', bounds, { opacity: 1 }).addTo(map);
+  <script>
+    // Parse URL parameters
+    const params = new URLSearchParams(window.location.search);
+    const latList = (params.get("lat") || "").split(",").map(Number);
+    const lonList = (params.get("long") || "").split(",").map(Number);
+    const countList = (params.get("count") || "").split(",").map(Number);
 
-        // === Add high-performance GeoJSON (streamed) ===
-        // Use leaflet-ajax for async streaming large GeoJSON
-        const geojsonLayer = new L.GeoJSON.AJAX('saudi_regions.geojson', {
-            style: {
-                color: 'orange',
-                weight: 1.5,
-                opacity: 0.8
-            }
+    // Initialize map
+    const map = L.map("map", {
+      zoomControl: false,
+      attributionControl: false,
+    }).setView([23.8859, 45.0792], 5);
+
+    // Add Saudi overlay map
+    const bounds = [[15, 34], [33, 56]];
+    L.imageOverlay("saudi_map.png", bounds).addTo(map);
+
+    // Add region outlines (optional)
+    fetch("saudi_regions.geojson")
+      .then((res) => res.json())
+      .then((data) => {
+        L.geoJSON(data, {
+          style: {
+            color: "#f9a825",
+            weight: 1.5,
+          },
         }).addTo(map);
+      });
 
-        // === Optional: Fit map to the overlay area ===
-        map.fitBounds(bounds);
-    </script>
+    // Handle very large datasets efficiently using Canvas Layer
+    const canvasLayer = L.canvasLayer().delegate({
+      onDrawLayer: function (info) {
+        const ctx = info.canvas.getContext("2d");
+        const map = info.layer._map;
+
+        ctx.clearRect(0, 0, info.canvas.width, info.canvas.height);
+        ctx.fillStyle = "rgba(0,150,255,0.8)";
+
+        for (let i = 0; i < latList.length; i++) {
+          const lat = latList[i], lon = lonList[i];
+          if (isNaN(lat) || isNaN(lon)) continue;
+          const p = map.latLngToContainerPoint([lat, lon]);
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      },
+    });
+
+    canvasLayer.addTo(map);
+  </script>
 </body>
 </html>
